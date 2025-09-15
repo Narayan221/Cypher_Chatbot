@@ -3,9 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>PDF Q&A Assistant</title>
+    <title>Cyphress Assistant</title>
     <style>
-        /* GENERAL STYLES */
         body {
             font-family: 'Poppins', sans-serif;
             margin: 0;
@@ -34,7 +33,6 @@
             overflow: hidden;
         }
 
-        /* SIDEBAR */
         .sidebar {
             width: 300px;
             background: white;
@@ -68,7 +66,6 @@
             background: #1d4ed8;
         }
 
-        /* CHAT AREA */
         .chat-container {
             flex: 1;
             display: flex;
@@ -113,7 +110,6 @@
             margin: 5px 0;
         }
 
-        /* INPUT AREA */
         .input-area {
             display: flex;
             gap: 10px;
@@ -139,7 +135,6 @@
             background: #1d4ed8;
         }
 
-        /* UPLOADED FILE */
         #uploadedFile {
             font-style: italic;
             color: #555;
@@ -150,8 +145,7 @@
 
 <body>
     <header>
-        <h1>📄 PDF Q&A Assistant</h1>
-        <p id="greeting"></p>
+        <h1>Cyphress</h1>
     </header>
 
     <main>
@@ -159,20 +153,15 @@
             <h2>Upload PDF</h2>
             <input type="file" id="pdfFile">
             <button onclick="uploadPDF()">Upload File</button>
-            <p id="uploadStatus"></p>
-            <p id="uploadedFile"></p>
-
-            <h2>User Info</h2>
-            <input type="text" id="name" placeholder="Enter Name">
-            <input type="email" id="email" placeholder="Enter Email">
-            <button onclick="saveUser()">Save Info</button>
+            <p id="uploadStatus" style="color: #555;"></p>
+            <div id="uploadedFile"></div>
         </div>
 
         <div class="chat-container">
             <div id="chatBox"></div>
             <div class="input-area">
                 <input type="text" id="userInput" placeholder="Ask something...">
-                <button onclick="ask()">Ask</button>
+                <button onclick="ask()">Submit</button>
             </div>
         </div>
     </main>
@@ -191,14 +180,15 @@
             formData.append("file", fileInput.files[0]);
 
             const uploadStatus = document.getElementById("uploadStatus");
-            uploadStatus.innerText = "Uploading...";
-            document.getElementById("uploadedFile").innerText = "";
 
             try {
-                const res = await fetch(`${backendUrl}/upload_pdf/`, { method: "POST", body: formData });
+                const res = await fetch("http://127.0.0.1:8000/upload_pdf/", { method: "POST", body: formData });
                 const data = await res.json();
-                uploadStatus.innerText = `✅ Uploaded ${fileInput.files[0].name} with ${data.chunks} chunks.`;
-                document.getElementById("uploadedFile").innerText = fileInput.files[0].name;
+                uploadStatus.innerText = "✅ PDF uploaded successfully!";
+
+                // Show PDF name below upload
+                document.getElementById("uploadedFile").innerText = `Uploaded: ${data.filename}`;
+
             } catch (err) {
                 uploadStatus.innerText = `⚠️ Upload failed: ${err.message}`;
             }
@@ -210,9 +200,14 @@
             const query = queryInput.value.trim();
             if (!query) return;
 
-            chatBox.innerHTML += `<div class="message user-msg">You: ${query}</div>`;
+            // Append user message
+            const userMsg = document.createElement("div");
+            userMsg.className = "message user-msg";
+            userMsg.innerText = `You: ${query}`;
+            chatBox.appendChild(userMsg);
             queryInput.value = "";
 
+            // Loader
             const loader = document.createElement("div");
             loader.className = "loader";
             loader.innerText = "AI is typing...";
@@ -228,28 +223,17 @@
                 const data = await res.json();
                 loader.remove();
 
-                chatBox.innerHTML += `<div class="message bot-msg">${data.answer || "No answer returned."}</div>`;
+                const botMsg = document.createElement("div");
+                botMsg.className = "message bot-msg";
+                botMsg.innerText = data.answer || "No answer returned.";
+                chatBox.appendChild(botMsg);
                 chatBox.scrollTop = chatBox.scrollHeight;
             } catch (err) {
                 loader.remove();
-                chatBox.innerHTML += `<div class="message bot-msg">⚠️ Error: ${err.message}</div>`;
-            }
-        }
-
-        async function saveUser() {
-            const name = document.getElementById("name").value;
-            const email = document.getElementById("email").value;
-
-            const formData = new FormData();
-            formData.append("name", name);
-            formData.append("email", email);
-
-            try {
-                const res = await fetch(`${backendUrl}/save_user/`, { method: "POST", body: formData });
-                const data = await res.json();
-                document.getElementById("greeting").innerText = `Hi ${data.user_data.name || ""}`;
-            } catch {
-                document.getElementById("greeting").innerText = "";
+                const errorMsg = document.createElement("div");
+                errorMsg.className = "message bot-msg";
+                errorMsg.innerText = `Error: ${err.message}`;
+                chatBox.appendChild(errorMsg);
             }
         }
     </script>

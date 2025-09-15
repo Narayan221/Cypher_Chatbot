@@ -1,8 +1,9 @@
 from PyPDF2 import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from io import BytesIO
 
-def extract_text_from_pdf(file_path):
-    reader = PdfReader(file_path)
+def extract_text_from_pdf(file_byte):
+    reader = PdfReader(BytesIO(file_byte))
     text = ""
     for page in reader.pages:
         text += page.extract_text() or ""

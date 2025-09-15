@@ -1,15 +1,16 @@
 import os
-from fastapi import FastAPI, UploadFile, Form
+import re
+from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from pdf_utils import extract_text_from_pdf, chunk_text
 from vector_store import VectorStore
 from mistral_client import ask_mistral
-from pydantic import BaseModel
 
 app = FastAPI()
 vector_store = None
-user_data = {}
+memory = {}  # Global memory for personal info
+
 class AskRequest(BaseModel):
     query: str
 
@@ -21,69 +22,81 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ------------------- Upload PDF -------------------
 @app.post("/upload_pdf/")
 async def upload_pdf(file: UploadFile):
     global vector_store
-    file_path = f"temp_{file.filename}"
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-
-    text = extract_text_from_pdf(file_path)
+    # file_path = f"temp_{file.filename}"
+    # with open(file_path, "wb") as f:
+    #     f.write(await file.read())
+    file_bytes = await file.read()
+    text = extract_text_from_pdf(file_bytes)
     chunks = chunk_text(text)
 
     vector_store = VectorStore()
     vector_store.build_index(chunks)
 
-    return {"status": "success", "chunks": len(chunks)}
+    return {"status": "success", "chunks": len(chunks), "filename": file.filename}
 
 @app.post("/ask/")
 async def ask_question(request: AskRequest):
-    query = request.query
-    global vector_store
+    global vector_store, memory
+    query = request.query.strip()
 
-    context_text = ""
+    # ----------------- Update memory with personal info -----------------
+    match_name = re.search(r"my name is (\w+ \w+|\w+)", query, re.IGNORECASE)
+    if match_name:
+        memory["name"] = match_name.group(1)
 
-    # If PDF exists, retrieve relevant chunks
+    match_age = re.search(r"i am (\d+) years? old", query, re.IGNORECASE)
+    if match_age:
+        memory["age"] = int(match_age.group(1))
+
+    # ----------------- PDF Context -----------------
     if vector_store and hasattr(vector_store, "get_relevant_chunks"):
         relevant_chunks = vector_store.get_relevant_chunks(query)
-        if relevant_chunks:
-            context_text = "\n".join(relevant_chunks)
+        context_text = "\n".join(relevant_chunks) if relevant_chunks else ""
+    else:
+        context_text = None  # No PDF uploaded
 
-    # Construct prompt for Mistral
-    if context_text:
+    # ----------------- Memory Context -----------------
+    memory_text = "\n".join([f"{k}: {v}" for k, v in memory.items()]) if memory else "No memory available."
+
+    # ----------------- Construct Prompt -----------------
+    if context_text:  # PDF exists
         prompt = f"""
 You are a helpful AI assistant.
-Refer to this excerpt from the uploaded PDF:
+User asked: {query}
+
+Memory:
+{memory_text}
+
+Refer to PDF:
 {context_text}
 
-User asked: {query}
-Answer based on the PDF content if possible.
-If not in PDF, answer based on your general knowledge.
-Be clear, professional, and detailed.
+Instructions:
+- Answer concisely using memory if relevant.
+- Use PDF content if relevant.
+- Otherwise answer using general knowledge.
+- Update memory if user provides new personal info.
+- Keep answers short and to the point.
 """
-    else:
+    else:  # No PDF uploaded
         prompt = f"""
 You are a helpful AI assistant.
 User asked: {query}
-Answer based on general knowledge.
-Be clear, professional, and detailed.
+
+Memory:
+{memory_text}
+
+Instructions:
+- Answer concisely using memory if relevant.
+- Otherwise answer using general knowledge.
+- Keep answers short and to the point.
 """
 
-    # Call Mistral
-    response = ask_mistral(prompt, query)  # pass both prompt and query
+    # ----------------- Get AI Response -----------------
+    response_text = ask_mistral(prompt, query)
 
-    return {"answer": response}
+    return {"answer": response_text, "memory": memory, "pdf_uploaded": bool(context_text)}
 
-
-
-@app.post("/save_user/")
-async def save_user(name: str = Form(None), email: str = Form(None)):
-    if name:
-        user_data["name"] = name
-    if email:
-        user_data["email"] = email
-    return {"status": "saved", "user_data": user_data}
-
-@app.get("/get_user/")
-async def get_user():
-    return user_data
