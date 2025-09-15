@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+python-multipart
+pypdf2
+faiss-cpu
+mistralai
+langchain-text-splitters
+jinja2

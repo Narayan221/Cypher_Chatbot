@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Q&A Assistant</title>
+    <style>
+        /* GENERAL STYLES */
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f4f6f8;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #2563eb;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 300px;
+            background: white;
+            padding: 20px;
+            box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar h2 {
+            margin-top: 0;
+            font-size: 20px;
+        }
+
+        .sidebar input,
+        .sidebar button {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+
+        .sidebar button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .sidebar button:hover {
+            background: #1d4ed8;
+        }
+
+        /* CHAT AREA */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            background: #e5e7eb;
+        }
+
+        #chatBox {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 15px;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 10px 15px;
+            border-radius: 12px;
+            max-width: 70%;
+            line-height: 1.4;
+        }
+
+        .user-msg {
+            background: #2563eb;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .bot-msg {
+            background: #f3f4f6;
+            color: #111;
+        }
+
+        .loader {
+            font-style: italic;
+            color: #555;
+            margin: 5px 0;
+        }
+
+        /* INPUT AREA */
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+
+        .input-area button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+
+        .input-area button:hover {
+            background: #1d4ed8;
+        }
+
+        /* UPLOADED FILE */
+        #uploadedFile {
+            font-style: italic;
+            color: #555;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>📄 PDF Q&A Assistant</h1>
+        <p id="greeting"></p>
+    </header>
+
+    <main>
+        <div class="sidebar">
+            <h2>Upload PDF</h2>
+            <input type="file" id="pdfFile">
+            <button onclick="uploadPDF()">Upload File</button>
+            <p id="uploadStatus"></p>
+            <p id="uploadedFile"></p>
+
+            <h2>User Info</h2>
+            <input type="text" id="name" placeholder="Enter Name">
+            <input type="email" id="email" placeholder="Enter Email">
+            <button onclick="saveUser()">Save Info</button>
+        </div>
+
+        <div class="chat-container">
+            <div id="chatBox"></div>
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="Ask something...">
+                <button onclick="ask()">Ask</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const backendUrl = "http://127.0.0.1:8000";
+
+        async function uploadPDF() {
+            const fileInput = document.getElementById("pdfFile");
+            if (!fileInput.files.length) {
+                alert("Please select a file first.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            const uploadStatus = document.getElementById("uploadStatus");
+            uploadStatus.innerText = "Uploading...";
+            document.getElementById("uploadedFile").innerText = "";
+
+            try {
+                const res = await fetch(`${backendUrl}/upload_pdf/`, { method: "POST", body: formData });
+                const data = await res.json();
+                uploadStatus.innerText = `✅ Uploaded ${fileInput.files[0].name} with ${data.chunks} chunks.`;
+                document.getElementById("uploadedFile").innerText = fileInput.files[0].name;
+            } catch (err) {
+                uploadStatus.innerText = `⚠️ Upload failed: ${err.message}`;
+            }
+        }
+
+        async function ask() {
+            const queryInput = document.getElementById("userInput");
+            const chatBox = document.getElementById("chatBox");
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            chatBox.innerHTML += `<div class="message user-msg">You: ${query}</div>`;
+            queryInput.value = "";
+
+            const loader = document.createElement("div");
+            loader.className = "loader";
+            loader.innerText = "AI is typing...";
+            chatBox.appendChild(loader);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const res = await fetch(`${backendUrl}/ask/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query })
+                });
+                const data = await res.json();
+                loader.remove();
+
+                chatBox.innerHTML += `<div class="message bot-msg">${data.answer || "No answer returned."}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } catch (err) {
+                loader.remove();
+                chatBox.innerHTML += `<div class="message bot-msg">⚠️ Error: ${err.message}</div>`;
+            }
+        }
+
+        async function saveUser() {
+            const name = document.getElementById("name").value;
+            const email = document.getElementById("email").value;
+
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("email", email);
+
+            try {
+                const res = await fetch(`${backendUrl}/save_user/`, { method: "POST", body: formData });
+                const data = await res.json();
+                document.getElementById("greeting").innerText = `Hi ${data.user_data.name || ""}`;
+            } catch {
+                document.getElementById("greeting").innerText = "";
+            }
+        }
+    </script>
+</body>
+
+</html>
