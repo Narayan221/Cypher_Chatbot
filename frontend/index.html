@@ -6,6 +6,54 @@
     <title>Cyphress Assistant</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
+        /* Top Logo Bar */
+        .top-logo-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 12px 0;
+            text-align: center;
+            z-index: 1000;
+        }
+
+        /* Logo Styling with Gradient Italic */
+        .logo {
+            font-family: Garamond, serif;
+            font-style: italic;
+            font-size: 6rem;
+            font-weight: bold;
+            background: linear-gradient(to right,
+                    #e7e8e9,
+                    #7970da,
+                    #392ae2,
+                    #0d037c);
+            background-size: 200% auto;
+            /* Required for animation */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+            margin: 0;
+            animation: shine 8s linear infinite;
+        }
+
+        /* Shine animation */
+        @keyframes shine {
+            0% {
+                background-position: 0% center;
+            }
+
+            100% {
+                background-position: 200% center;
+            }
+        }
+
+        /* Push down chat + sidebar so they don’t overlap */
+        .app-container {
+            margin-top: 70px;
+            /* adjust based on bar height */
+        }
+
         /* GENERAL STYLING */
         * {
             box-sizing: border-box;
@@ -188,6 +236,9 @@
 </head>
 
 <body>
+    <div class="top-logo-bar">
+        <h1 class="logo">Cyphress AI</h1>
+    </div>
     <div class="app-container">
         <div class="sidebar">
             <h2>Upload PDF</h2>
