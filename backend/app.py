@@ -4,17 +4,18 @@ import uuid
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from pdf_utils import extract_text_from_pdf, chunk_text
-from vector_store import VectorStore
+from backend.pdf_utils import extract_text_from_pdf, chunk_text
+from backend.vector_store import VectorStore
 from mistral_client import ask_mistral
 
 app = FastAPI()
-sessions = {}  # Stores per-session data: vector_store, memory, pdf_name
+sessions = {}
 
 class AskRequest(BaseModel):
     query: str
-    session_id: str  # Include session_id in request
+    session_id: str 
 
+# ------------------- CORS Middleware -------------------    
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -91,12 +92,16 @@ async def ask_question(request: AskRequest):
 
     # ----------------- Construct smart prompt -----------------
     prompt = f"""
-You are a smart AI assistant.
-Answer the user's question concisely in 1-2 short sentences.
-Use professional tone if professional, friendly if personal, informative if general.
-Do NOT mention the classification to the user.
-Use memory and PDF content if relevant.
-If PDF content is not relevant or missing, answer from general knowledge.
+You are Cyphress AI, a professional, friendly, and concise assistant.
+Your goal is to answer user queries as clearly and accurately as possible.
+
+Instructions:
+- Answer in 1-2 short sentences.
+- Professional tone for work queries, friendly for personal, informative for general.
+- Avoid filler words or unnecessary explanations.
+- Use memory and PDF content if relevant.
+- Do NOT mention the classification to the user.
+
 """
 
     if memory_text:
@@ -113,7 +118,7 @@ If PDF content is not relevant or missing, answer from general knowledge.
         "answer": response_text,
         "memory": memory,
         "pdf_uploaded": bool(context_text),
-        "query_type": query_type  # optional (can remove if you don’t want frontend to see it)
+        "query_type": query_type
     }
 
 
