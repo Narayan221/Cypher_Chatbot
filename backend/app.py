@@ -4,6 +4,7 @@ import uuid
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import uvicorn
 from backend.pdf_utils import extract_text_from_pdf, chunk_text
 from backend.vector_store import VectorStore
 from mistral_client import ask_mistral
@@ -141,3 +142,8 @@ async def validate_session(data: dict):
     if session_id in sessions:
         return {"valid": True}
     return {"valid": False}
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("backend.app:app", host="0.0.0.0", port=port, reload=False)
